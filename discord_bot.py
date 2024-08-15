@@ -6,10 +6,22 @@ import datetime
 import pytz
 import asyncio
 import re
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger('discord')
+logger.setLevel(logging.DEBUG)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
+logger.addHandler(handler)
 
 # Configuration
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+
+logger.info(f"Discord Token: {'Set' if DISCORD_TOKEN else 'Not Set'}")
+logger.info(f"OpenAI API Key: {'Set' if OPENAI_API_KEY else 'Not Set'}")
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 TIMEZONE = pytz.timezone("Europe/Rome")
@@ -45,11 +57,12 @@ def get_current_time():
 
 @bot.event
 async def on_ready():
-    print(f'{bot.user} has connected to Discord!')
+    logger.info(f'{bot.user} has connected to Discord!')
     check_reminders.start()
 
 @bot.command()
 async def start(ctx):
+    logger.info(f"Start command received from user {ctx.author.id}")
     user_id = ctx.author.id
     user_data[user_id] = {"conversation": [], "reminders": [], "language": "en"}
     embed = discord.Embed(title="Language Selection", description="Please choose your language:")
@@ -64,6 +77,7 @@ async def on_reaction_add(reaction, user):
     if user == bot.user:
         return
 
+    logger.info(f"Reaction {reaction.emoji} added by user {user.id}")
     if reaction.message.author == bot.user and reaction.message.embeds and reaction.message.embeds[0].title == "Language Selection":
         user_id = user.id
         if str(reaction.emoji) == "🇬🇧":
@@ -80,6 +94,7 @@ async def on_message(message):
     if message.author == bot.user:
         return
 
+    logger.info(f"Message received from user {message.author.id}: {message.content}")
     await bot.process_commands(message)
 
     user_id = message.author.id
@@ -102,10 +117,12 @@ async def on_message(message):
     conversation = [system_message] + user_data[user_id]["conversation"][-10:]
 
     try:
+        logger.info("Sending request to OpenAI API")
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=conversation
         )
+        logger.info("Received response from OpenAI API")
 
         ai_response = response.choices[0].message.content
         user_data[user_id]["conversation"].append({"role": "assistant", "content": ai_response})
@@ -123,7 +140,7 @@ async def on_message(message):
         await message.channel.send(ai_response)
 
     except Exception as e:
-        print(f"API Call Error: {e}")
+        logger.error(f"API Call Error: {e}")
         await message.channel.send(MESSAGES[lang]['processing_error'])
 
 def extract_multiple_reminders(text):
@@ -157,6 +174,7 @@ def extract_single_reminder(text):
 
 @bot.command()
 async def viewreminders(ctx):
+    logger.info(f"Viewreminders command received from user {ctx.author.id}")
     user_id = ctx.author.id
     lang = user_data.get(user_id, {}).get('language', 'en')
     if user_id in user_data and user_data[user_id]["reminders"]:
@@ -168,6 +186,7 @@ async def viewreminders(ctx):
 
 @tasks.loop(seconds=10)
 async def check_reminders():
+    logger.debug("Checking reminders")
     current_time = get_current_time()
     for user_id, data in user_data.items():
         reminders_to_remove = []
@@ -180,4 +199,5 @@ async def check_reminders():
             data["reminders"].remove(reminder)
 
 if __name__ == '__main__':
+    logger.info("Starting bot")
     bot.run(DISCORD_TOKEN)
