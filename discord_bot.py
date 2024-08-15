@@ -8,6 +8,7 @@ import asyncio
 import re
 import logging
 import traceback
+import random
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -60,6 +61,7 @@ def get_current_time():
 async def on_ready():
     logger.info(f'{bot.user} has connected to Discord!')
     check_reminders.start()
+    keep_alive.start()
 
 @bot.command()
 async def start(ctx):
@@ -224,12 +226,26 @@ async def check_reminders():
         logger.error(f"Error in check_reminders: {str(e)}")
         logger.error(traceback.format_exc())
 
+@tasks.loop(minutes=5)
+async def keep_alive():
+    try:
+        logger.debug("Sending keep-alive ping")
+        latency = bot.latency
+        logger.info(f"Current latency: {latency}")
+    except Exception as e:
+        logger.error(f"Error in keep_alive: {str(e)}")
+        logger.error(traceback.format_exc())
+
+async def main():
+    async with bot:
+        await bot.start(DISCORD_TOKEN)
+
 if __name__ == '__main__':
     logger.info("Starting bot")
     while True:
         try:
-            bot.run(DISCORD_TOKEN)
+            asyncio.run(main())
         except Exception as e:
             logger.error(f"Bot crashed. Restarting in 5 seconds. Error: {str(e)}")
             logger.error(traceback.format_exc())
-            asyncio.sleep(5)
+            asyncio.sleep(5 + random.uniform(0, 5))  # Add some randomness to avoid potential rate limits
