@@ -20,7 +20,7 @@ This is a Discord bot that serves as an AI personal assistant. It can help with 
    - OPENAI_API_KEY: Your OpenAI API key
 4. Run the bot:
    ```
-   python discord-bot.py
+   python discord_bot.py
    ```
 
 ## Deployment
