@@ -2,6 +2,7 @@ import os
 import discord
 from discord.ext import commands, tasks
 from openai import OpenAI
+from openai.error import AuthenticationError, APIError
 import datetime
 import pytz
 import asyncio
@@ -43,6 +44,7 @@ MESSAGES = {
         'no_reminders': "You don't have any reminders set.",
         'reminders_list': "Here are your reminders:\n{reminders}",
         'processing_error': "Sorry, I had a problem processing your request. Can you try again?",
+        'api_key_error': "There's an issue with the AI service. Please contact the bot administrator.",
     },
     'it': {
         'welcome': "Ciao! Sono il tuo assistente personale IA avanzato. Posso aiutarti con promemoria, note e molto altro. Come posso assisterti oggi?",
@@ -51,6 +53,7 @@ MESSAGES = {
         'no_reminders': "Non hai ancora nessun promemoria impostato.",
         'reminders_list': "Ecco i tuoi promemoria:\n{reminders}",
         'processing_error': "Mi dispiace, ho avuto un problema nel processare la tua richiesta. Puoi riprovare?",
+        'api_key_error': "C'è un problema con il servizio AI. Si prega di contattare l'amministratore del bot.",
     }
 }
 
@@ -151,8 +154,14 @@ async def on_message(message):
             
             await message.channel.send(ai_response)
 
+        except AuthenticationError as e:
+            logger.error(f"OpenAI API Authentication Error: {e}")
+            await message.channel.send(MESSAGES[lang]['api_key_error'])
+        except APIError as e:
+            logger.error(f"OpenAI API Error: {e}")
+            await message.channel.send(MESSAGES[lang]['processing_error'])
         except Exception as e:
-            logger.error(f"API Call Error: {e}")
+            logger.error(f"Unexpected error in OpenAI API call: {e}")
             logger.error(traceback.format_exc())
             await message.channel.send(MESSAGES[lang]['processing_error'])
     except Exception as e:
